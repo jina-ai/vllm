@@ -56,7 +56,7 @@ def get_local_guided_decoding_logits_processor(
 def _adapt_request_for_tool_use(request: Union[CompletionRequest,
                                                ChatCompletionRequest]):
     # the legacy completion API does not support tool use
-    if type(request) is CompletionRequest:
+    if isinstance(request, CompletionRequest):
         return request
 
     # user has chosen to not use any tool
