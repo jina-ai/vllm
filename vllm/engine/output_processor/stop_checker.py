@@ -97,11 +97,14 @@ class StopChecker:
         # Check if the last ngram is repeated in the output text.
         last_token = seq.output_text[-new_char_count:]
         # start checking for repetition after the first 32 tokens
-        if seq.get_output_len() > 32 and self.check_ngram_repetition(seq, sampling_params, last_token):
+        if seq.get_output_len() > 32 and self.check_ngram_repetition(
+                seq, sampling_params, last_token):
             seq.status = SequenceStatus.FINISHED_REPEATED
             return
 
-    def check_ngram_repetition(self, seq: Sequence, sampling_params: SamplingParams, last_token: str) -> bool:
+    def check_ngram_repetition(self, seq: Sequence,
+                               sampling_params: SamplingParams,
+                               last_token: str) -> bool:
         """Check if the last ngram is repeated in the output text.
         """
 
@@ -159,8 +162,6 @@ class StopChecker:
                 is_done = self.repeated_total >= 8
 
         return is_done
-
-
 
     @staticmethod
     def _check_stop_strings(seq: Sequence, new_char_count: int,
