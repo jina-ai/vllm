@@ -407,6 +407,17 @@ class Sequence:
         # Input + output tokens
         self.tokens: Optional[List[str]] = None
 
+
+        # the position to start checking for repetition
+        self.repeat_start_from = 0
+
+        # the number of tokens repeated
+        self.repeated_count = 0
+        # the gap between the repeated tokens
+        self.repeated_gap = 0
+        # the repeated ngram that we already generated
+        self.repeated_total = 0
+
     @property
     def n_blocks(self) -> int:
         return (self.get_len() + self.block_size - 1) // self.block_size

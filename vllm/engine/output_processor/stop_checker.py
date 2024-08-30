@@ -19,16 +19,6 @@ class StopChecker:
         self._max_model_len = max_model_len
         self.get_tokenizer_for_seq = get_tokenizer_for_seq
 
-        # the position to start checking for repetition
-        self.repeat_start_from = 0
-
-        # the number of tokens repeated
-        self.repeated_count = 0
-        # the gap between the repeated tokens
-        self.repeated_gap = 0
-        # the repeated ngram that we already generated
-        self.repeated_total = 0
-
     def _get_max_model_len(self, lora_req: Optional[LoRARequest]):
         if lora_req and lora_req.long_lora_max_len:
             return lora_req.long_lora_max_len
@@ -97,12 +87,13 @@ class StopChecker:
         # Check if the last ngram is repeated in the output text.
         last_token = seq.output_text[-new_char_count:]
         # start checking for repetition after the first 32 tokens
-        if seq.get_output_len() > 32 and self.check_ngram_repetition(
+        if seq.get_output_len() > 32 and self._check_ngram_repetition(
                 seq, sampling_params, last_token):
             seq.status = SequenceStatus.FINISHED_REPEATED
             return
 
-    def check_ngram_repetition(self, seq: Sequence,
+    @staticmethod
+    def _check_ngram_repetition(seq: Sequence,
                                sampling_params: SamplingParams,
                                last_token: str) -> bool:
         """Check if the last ngram is repeated in the output text.
@@ -116,50 +107,50 @@ class StopChecker:
         repeated_at = None
         repeated_gap = None
 
-        for i, token in enumerate(output_ids[self.repeat_start_from:-1]):
+        for i, token in enumerate(output_ids[seq.repeat_start_from:-1]):
             if token == last_token_id:
-                repeated_at = self.repeat_start_from + i
-                repeated_gap = output_len - repeated_at
+                repeated_at = seq.repeat_start_from + i
+                repeated_gap = output_len - repeated_at - 1
 
         if repeated_at is not None:
-            self.repeated_count += 1
+            seq.repeated_count += 1
             # token_str = self.tokenizer.convert_ids_to_tokens([last_token])[0]
             # print(
             #     f"\n==> token ({last_token}) at {output_len}\n"
             #     f"==> repeat_at: {repeated_at}\n"
-            #     f"==> repeated_count: {self.repeated_count}\n"
+            #     f"==> repeated_count: {seq.repeated_count}\n"
             #     f"==> repeated_gap: {repeated_gap}\n"
-            #     f"==> repeate_start_from: {self.repeat_start_from}"
+            #     f"==> repeate_start_from: {seq.repeat_start_from}"
             # )
 
-            self.repeat_start_from = repeated_at
+            seq.repeat_start_from = repeated_at
 
-        if repeated_at is None or repeated_gap != self.repeated_gap:
-            self.repeated_count = 0
-            self.repeated_gap = 0
-            self.repeated_total = 0
+        if repeated_at is None or repeated_gap != seq.repeated_gap:
+            seq.repeated_count = 0
+            seq.repeated_gap = 0
+            seq.repeated_total = 0
 
         if repeated_gap is not None:
-            self.repeated_gap = repeated_gap
+            seq.repeated_gap = repeated_gap
 
-        if self.repeated_count == self.repeated_gap and self.repeated_gap:
-            self.repeated_total += 1
-            self.repeated_count = 0
+        if seq.repeated_count == seq.repeated_gap and seq.repeated_gap:
+            seq.repeated_total += 1
+            seq.repeated_count = 0
 
-            # print(f"==> repeated_total: {self.repeated_total}")
+            # print(f"==> repeated_total: {seq.repeated_total}")
 
-            repeate_ngram_size = self.repeated_gap
+            repeate_ngram_size = seq.repeated_gap
             # print(f'==> repeate_ngram_size: {repeate_ngram_size}')
 
             if repeate_ngram_size == 1:
                 # single token repetition
-                is_done = self.repeated_total > 64
+                is_done = seq.repeated_total > 64
             elif repeate_ngram_size > 64:
                 # paragraph repetition
-                is_done = self.repeated_total >= 4
+                is_done = seq.repeated_total >= 4
             else:
                 # short ngram repetition?
-                is_done = self.repeated_total >= 8
+                is_done = seq.repeated_total >= 8
 
         return is_done
 
