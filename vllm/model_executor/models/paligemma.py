@@ -145,7 +145,6 @@ class PaliGemmaForConditionalGeneration(nn.Module, SupportsMultiModal):
         self.config = config
         self.multimodal_config = multimodal_config
 
-        # TODO(ywang96): Port over SiglipVisionModel & TP
         self.vision_tower = SiglipVisionModel(config.vision_config)
         self.multi_modal_projector = PaliGemmaMultiModalProjector(
             vision_hidden_size=config.vision_config.hidden_size,
@@ -308,12 +307,7 @@ class PaliGemmaForConditionalGeneration(nn.Module, SupportsMultiModal):
                 if key_to_modify in name:
                     name = name.replace(key_to_modify, new_key)
             use_default_weight_loading = False
-            if "vision" in name:
-                if self.vision_tower is not None:
-                    # We only do sharding for language model and
-                    # not vision model for now.
-                    use_default_weight_loading = True
-            else:
+            if "vision" not in name or self.vision_tower.shard_weight:
                 for (param_name, shard_name,
                      shard_id) in stacked_params_mapping:
                     if shard_name not in name:
@@ -336,6 +330,8 @@ class PaliGemmaForConditionalGeneration(nn.Module, SupportsMultiModal):
                     if name.endswith(".bias") and name not in params_dict:
                         continue
                     use_default_weight_loading = True
+            else:
+                use_default_weight_loading = True
 
             if use_default_weight_loading:
                 param = params_dict[name]
