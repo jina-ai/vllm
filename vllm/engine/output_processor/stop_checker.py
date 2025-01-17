@@ -1,9 +1,20 @@
 from typing import Callable, Optional, Tuple, List
+from dataclasses import dataclass
 
 from vllm.lora.request import LoRARequest
 from vllm.sampling_params import SamplingParams
 from vllm.sequence import Sequence, SequenceStatus
 from vllm.transformers_utils.tokenizer import AnyTokenizer
+
+
+@dataclass
+class RepetitionConfig:
+    single_token_threshold: int = 64
+    large_ngram_threshold: int = 4
+    medium_ngram_threshold: int = 8
+
+    # start checking for repetition after the first 1024 tokens
+    start_checking_after: int = 1024
 
 
 class StopChecker:
@@ -18,6 +29,7 @@ class StopChecker:
         # Do not use it directly, but use `self._get_max_model_len`.
         self._max_model_len = max_model_len
         self.get_tokenizer_for_seq = get_tokenizer_for_seq
+        self.repetition_config = RepetitionConfig()
 
     def _get_max_model_len(self, lora_req: Optional[LoRARequest]):
         if lora_req and lora_req.long_lora_max_len:
@@ -96,8 +108,9 @@ class StopChecker:
             seq.status = SequenceStatus.FINISHED_REPEATED
             return
 
-    @staticmethod
-    def check_ngram_repetition(seq: Sequence,
+
+    def check_ngram_repetition(self,
+                                seq: Sequence,
                                sampling_params: SamplingParams,
                                last_token: str) -> bool:
         """Check if the last ngram is repeated in the output text.
@@ -107,6 +120,11 @@ class StopChecker:
         output_ids = seq.get_output_token_ids()
         last_token_id = seq.get_last_token_id()
         output_len = seq.get_output_len()
+
+
+        # Only check if we have enough tokens
+        if output_len <= self.repetition_config.start_checking_after:
+            return False
 
         repeated_at = None
         repeated_gap = None
@@ -129,6 +147,7 @@ class StopChecker:
 
             seq.repeat_start_from = repeated_at
 
+        # reset the repetition count if the gap changes
         if repeated_at is None or repeated_gap != seq.repeated_gap:
             seq.repeated_count = 0
             seq.repeated_gap = 0
@@ -148,13 +167,13 @@ class StopChecker:
 
             if repeate_ngram_size == 1:
                 # single token repetition
-                is_done = seq.repeated_total > 64
+                is_done = seq.repeated_total > self.repetition_config.single_token_threshold
             elif repeate_ngram_size > 64:
                 # paragraph repetition
-                is_done = seq.repeated_total >= 4
+                is_done = seq.repeated_total >= self.repetition_config.large_ngram_threshold
             else:
                 # short ngram repetition?
-                is_done = seq.repeated_total >= 8
+                is_done = seq.repeated_total >= self.repetition_config.medium_ngram_threshold
 
         return is_done
 
