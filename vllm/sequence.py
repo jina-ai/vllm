@@ -442,7 +442,7 @@ class Sequence:
         # the number of tokens repeated
         self.repeated_count = 0
         # the gap between the repeated tokens
-        self.repeated_gap = 0
+        self.repeated_gap = None
         # the repeated ngram that we already generated
         self.repeated_total = 0
 

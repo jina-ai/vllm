@@ -14,7 +14,7 @@ class RepetitionConfig:
     medium_ngram_threshold: int = 8
 
     # start checking for repetition after the first 1024 tokens
-    start_checking_after: int = 1024
+    start_checking_after: int = 1
 
 
 class StopChecker:
@@ -132,6 +132,10 @@ class StopChecker:
             if token == last_token_id:
                 repeated_at = seq.repeat_start_from + i
                 repeated_gap = output_len - repeated_at - 1
+                if seq.repeated_gap is None:
+                    seq.repeated_gap = repeated_gap
+                elif seq.repeated_gap == repeated_gap:
+                    break
 
         if repeated_at is not None:
             seq.repeated_count += 1
@@ -140,8 +144,9 @@ class StopChecker:
             #     f"\n==> token ({last_token}) at {output_len}\n"
             #     f"==> repeat_at: {repeated_at}\n"
             #     f"==> repeated_count: {seq.repeated_count}\n"
-            #     f"==> repeated_gap: {repeated_gap}\n"
-            #     f"==> repeate_start_from: {seq.repeat_start_from}"
+            #     f"==> repeated_gap: {repeated_gap} vs {seq.repeated_gap}\n"
+            #     f"==> repeate_start_from: {seq.repeat_start_from}\n"
+            #     f"==> repeated_total: {seq.repeated_total}\n"
             # )
 
             seq.repeat_start_from = repeated_at
@@ -149,10 +154,9 @@ class StopChecker:
         # reset the repetition count if the gap changes
         if repeated_at is None or repeated_gap != seq.repeated_gap:
             seq.repeated_count = 0
-            seq.repeated_gap = 0
             seq.repeated_total = 0
 
-        if repeated_gap is not None:
+        if seq.repeated_gap != repeated_gap:
             seq.repeated_gap = repeated_gap
 
         if seq.repeated_count == seq.repeated_gap and seq.repeated_gap:
@@ -161,13 +165,13 @@ class StopChecker:
 
             # print(f"==> repeated_total: {seq.repeated_total}")
 
-            repeate_ngram_size = seq.repeated_gap
+            # repeate_ngram_size = seq.repeated_gap
             # print(f'==> repeate_ngram_size: {repeate_ngram_size}')
 
-            if repeate_ngram_size == 1:
+            if seq.repeated_gap == 1:
                 # single token repetition
                 is_done = seq.repeated_total > self.repetition_config.single_token_threshold
-            elif repeate_ngram_size > 64:
+            elif seq.repeated_gap > 64:
                 # paragraph repetition
                 is_done = seq.repeated_total >= self.repetition_config.large_ngram_threshold
             else:
